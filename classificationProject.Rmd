@@ -44,9 +44,6 @@ Random forest is a supervised learning algorithm/model that uses a large number 
 “predicting with votes”.
 Estimating the out-of-bag error - OOB
 
-**a. Subbagging - Subsample Aggregating**
-
-
 **4. Boosting of decision trees**
 
 “predicting with votes”.
@@ -59,7 +56,7 @@ Estimating the out-of-bag error - OOB
 **b. XGBost: Extreme Gradient Boosting**
  also called regularized boosting method, has 
 
-- intelligent tree prunning
+- Intelligent tree prunning
 - Newton-Raphson approximation
 - Additional randomization parameter
 - parallelization
@@ -96,7 +93,7 @@ Before we get to the modeling itself, we will analyse the data at hand.
 Installing the necessary packages 
 ```{r}
 
-requiredPackages = c("e1071","randomForest","janitor","verification","olsrr","DescTools","caret","tibble","purrr","corrplot","dbplyr","dplyr","readr", "ggplot2", "tidyverse","tree","rpart","rpart.plot","rattle","here", "pROC","xgboost","neuralnet")
+requiredPackages = c("e1071","randomForest","caretEnsemble","verification","olsrr","DescTools","caret","tibble","purrr","corrplot","dbplyr","dplyr","readr", "ggplot2", "tidyverse","tree","rpart","rpart.plot","rattle","here", "pROC","xgboost","neuralnet")
 
 for(i in requiredPackages){if(!require(i,character.only = TRUE)) install.packages(i)}
 for(i in requiredPackages){if(!require(i,character.only = TRUE)) library(i,character.only = TRUE)}
@@ -104,7 +101,7 @@ for(i in requiredPackages){if(!require(i,character.only = TRUE)) library(i,chara
 ```  
 
 ```{r, echo=FALSE}
-setwd("C:\\Users\\48574\\Documents\\Data Science\\Sem3\\Machine Learning 2\\Project")
+setwd("C:\\Users\\Tesfahun Boshe\\Documents\\classification-censusincome-ml")
 
 ```
 
@@ -126,7 +123,7 @@ table(data_train$PTOTVAL)
 
 ```
 
-*PTOTVAL* is a ordinal catoegorical variable with two levels (-50000,50000+). 
+*PTOTVAL* is an ordinal categorical variable with two levels (-50000,50000+). 
 
 ```{r}
 # is.factor(data_train$PTOTVAL)
@@ -134,7 +131,7 @@ data_train$PTOTVAL <- factor(data_train$PTOTVAL,
                            levels = c(" 50000+.","-50000"), #level 5000 is set as the first one
                            ordered = TRUE) # ordinal
 
-levels(data_train$PTOTVAL)
+# levels(data_train$PTOTVAL)
 table(data_train$PTOTVAL)
 ```
 
@@ -346,39 +343,15 @@ data_test[categorical_vars] <- lapply(data_test[categorical_vars],factor)
 data_test$PTOTVAL <- as.factor(ifelse(data_test$PTOTVAL=="-50000","NO","YES"))
 
 
-
-## Decision Trees for classification
 ```
-
-Let's also define the function for checking the model performance. 
-
-The following function decodes the predicted probability values to binary levels,(0,1), and then calculates the model accuracy statistics from the confusion matrix it creates. 
-
-```{r}
-summary_binary <- function(predicted_probs,
-                           real,
-                           cutoff = 0.5,
-                           level_positive = "YES",
-                           level_negative = "NO") {
-
-  ctable <- confusionMatrix(as.factor(ifelse(predicted_probs > cutoff, 
-                                             level_positive, 
-                                             level_negative)), 
-                            real, 
-                            level_positive) 
-
-  stats <- round(c(ctable$overall[1],
-                   ctable$byClass[c(1:4, 7, 11)]),5)
-  return(stats)
-}
-```
-
 
 
 ### Models
 Now that we have selected the variables, we can start modeling. 
 
-*A. Using GINI coefficient as the split criterion *
+*Decision Trees for classification*
+
+A. Using GINI coefficient as the split criterion
 
 Let's start with cross-validation for the best results. 
 ```{r,cache = TRUE}
@@ -441,7 +414,7 @@ prediction_test_GINI_final <- predict(model_GINI_final,
 
 ```
 
-*B. Using Information Gain as the split criterion* 
+B. Using Information Gain as the split criterion
 
 ```{r}
 
@@ -484,7 +457,7 @@ Prediction on the train and test data.
 prediction_train_IG_final <- predict(model_GINI_final, 
                             data_train[selectedvars[!selectedvars %in% "PTOTVAL"]],type = "prob")
 
-prediction_test_IG_pruneed <- predict(model_GINI_final, 
+prediction_test_IG_final <- predict(model_GINI_final, 
                             data_test[selectedvars[!selectedvars %in% "PTOTVAL"]],type = "prob")
 ```
 
@@ -521,24 +494,71 @@ fancyRpartPlot(model_IG_final)
 
 
 ```{r}
-# 
-# set.seed(1234)
-# model_RF <- randomForest(PTOTVAL ~ ., 
-#                            data = data_train[selectedvars])
+
+set.seed(12345)
+model_RF <- randomForest(PTOTVAL ~ .,
+                           data = data_train[selectedvars])
 ```
 
 Prediction on the train and test data. 
+Let's do some trick to equalize the classes of training and test sets. 
+
 ```{r}
-# prediction_train_RF <- predict(model_RF, 
-#                             data_train[selectedvars[!selectedvars %in% "PTOTVAL"]],type = "prob")
-# 
-# prediction_test_RF <- predict(model_RF, 
-#                             data_test[selectedvars[!selectedvars %in% "PTOTVAL"]],type = "prob")
+
+data_test <- rbind(data_train[1, ] , data_test)
+data_test <- data_test[-1,]
 ```
+
+Prediction
+```{r}
+prediction_train_RF <- predict(model_RF,
+                            data_train[selectedvars[!selectedvars %in% "PTOTVAL"]],type = "prob")
+
+prediction_test_RF <- predict(model_RF,
+                            data_test[selectedvars[!selectedvars %in% "PTOTVAL"]],type = "prob")
+```
+
+### Comparison of the models on performance
+
+Let's define a function that decodes the predicted probability values to binary levels,(0,1), and then calculates the model accuracy statistics from the confusion matrix it creates. 
+
+```{r}
+summary_binary <- function(predicted_probs,
+                           real = data_test$PTOTVAL,
+                           cutoff = 0.5,
+                           level_positive = "NO",
+                           level_negative = "YES") {
+
+  ctable <- confusionMatrix(as.factor(ifelse(predicted_probs >= cutoff, 
+                                             level_positive, 
+                                             level_negative)), 
+                            real, 
+                            level_positive) 
+
+  stats <- round(c(ctable$overall[1],
+                   ctable$byClass[c(1:4, 7, 11)]),5)
+  return(stats)
+}
+```
+
+
+Using the function created above, we can compare the test-data predictions of the above models and determine the best performing model for the stages to follow. 
+
+
+```{r}
+
+predictions <- c(prediction_test_GINI_final[,2], prediction_test_IG_final[,2], prediction_test_RF[,2])
+# statistics_by_model <- lapply(predictions, summary_binary)
+(stats_GINI <- summary_binary(prediction_test_GINI_final[,2]))
+(stats_IG <- summary_binary(prediction_test_IG_final[,2]))
+(stats_RF <- summary_binary(prediction_test_RF[,2]))
+```
+
+Comparing the results, we see that model_IG_final works the best. It will be used for bagging algorithm. 
 
 ## Bagging (bootstrap averaging)
 
-We will use the best model from the above 4 and apply boosting/bagging algorithms to see if the accuracy will improve. 
+We will model_IG_final from above steps and apply bagging algorithms to see if the accuracy will improve. 
 
 We will create 15 models from samples of the data. (Odd to make it easier for majority voting). 
 ```{r}
@@ -555,14 +575,14 @@ for (sample in 1:15) {
                          size = n,
                          replace = TRUE),]
 
-  results_bagging[[sample]] <-  rpart(PTOTVAL ~ .,
-                                    data = data_sample, # sample data
-                                    method = "class", # type of the tree: classification
-                                    parms = list(split = 'information'),  # entropy for decision criterion
-                                    minsplit = 500, # chosen value
-                                    minbucket = 250,# chosen value
-                                    maxdepth = 30, # chosen value
-                                    cp = -1 )
+  results_bagging[[sample]] <-  rpart(PTOTVAL ~ ., # model formula
+                                      data = data_train[selectedvars], # data
+                                      method = "class", # type of the tree: classification
+                                      parms = list(split = 'information'),  # entropy for decision criterion
+                                      minsplit = 500, # chosen after multiple attempts
+                                      minbucket = 250,# chosen after multiple attempts
+                                      maxdepth = 30, # chosen after multiple attempts
+                                      cp = -1 )
   
   rm(data_sample)
 }
@@ -581,35 +601,49 @@ prediction_bagging <-
 prediction_bagging <- (prediction_bagging=="YES")*1
 ```
 
-Majority voting. (If more than half votes for a *YES*, it is a *YES*)
+
+Bagging improved the prediction accuracy. 
+
+*Majority voting*
+Majority voting -  (If more than half votes for a *YES*, it is a *YES*)
 ```{r}
 
-prediction_bagging_final <-
-  ifelse(rowSums(prediction_bagging) > 15/2,
-         "YES", "NO") %>% 
-  factor(., levels = c("YES", "NO"))
+prediction_bagging_YESNO <- ifelse(rowSums(prediction_bagging) > 7.5,
+       "NO", "YES") %>% 
+factor(., levels = c("YES", "NO"))
+
 ```
 
-
+Let's compare the result to the results of  model_IG_final, first with confusion matrix, and later with ROC/AUC. 
 ```{r}
-confusionMatrix(data = prediction_bagging_final,
+
+
+
+(metrics_IG_final <- confusionMatrix(data = as.factor(ifelse(prediction_test_IG_final[,2]> 0.5,"NO", "YES")),
                 reference =data_test$PTOTVAL,
-                positive = "YES")
+                positive = "YES"))
+
+(metrics_bagging <- confusionMatrix(data = prediction_bagging_YESNO,
+                reference =data_test$PTOTVAL,
+                positive = "YES"))
 
 ```
+
+Comment: Bagging improved the prediction accuracy. 
+
 
 ROC and AUC
 ```{r}
-datausa.ROC.test.bag <-
-  roc(as.numeric(data_test$PTOTVAL == "Yes"), 
-      prediction_bagging_final2)
+# datausa.ROC.test.bag <-
+#   roc(as.numeric(data_test$PTOTVAL == "Yes"), 
+#       rowMeans(prediction_bagging))
 
 ```
 
 
 ## Boosting of decision trees
 Boosting is a sequentially additive model improvement algorithm, where each subsequent model improves the results of the previous ones. 
-There are multiple boosting algorithms. We will use GBM (Gradient Boosting Models) and XGBoost (Extreme Gradient Boosting). 
+There are multiple boosting algorithms. Some of the boosting methods are GBM (Gradient Boosting Models) and XGBoost (Extreme Gradient Boosting).We will apply XGBoost algorithm and compare to the results we obtained above. 
 
 a. GBM: Gradient Boosting Models
 
@@ -629,17 +663,17 @@ Stochastic Gradient Boosting is a GBM technique with a notion that injecting ran
 
 
 
-set.seed(123456789)
-model_GBM  <- train(PTOTVAL ~ .,
-                       data = data_train[selectedvars][1:1000,], # choosing the first 1000 rows from the trainign dataset
-                       distribution = "bernoulli",
-                       method = "gbm",
-                       # tuneGrid = parameters_gbm,
-                       # trControl = tc2,
-                       verbose = FALSE)
-
-# best set of parameters
-model_GBM
+# set.seed(123456)
+# model_GBM  <- train(PTOTVAL ~ .,
+#                        data = data_train[selectedvars][1:1000,], # choosing the first 1000 rows from the training dataset
+#                        distribution = "bernoulli",
+#                        method = "gbm",
+#                        # tuneGrid = parameters_gbm,
+#                        # trControl = tc2,
+#                        verbose = FALSE)
+# 
+# # best set of parameters
+# model_GBM
 
 # Hence:
 # 
@@ -652,19 +686,19 @@ model_GBM
 
 Prediction on the train and test data. 
 ```{r}
-prediction_train_GBM <- predict(model_GBM,
-                            data_train[selectedvars[!selectedvars %in% "PTOTVAL"]][1:1000,])
-
-prediction_test_GBM <- predict(model_GBM,
-                            data_test[selectedvars[!selectedvars %in% "PTOTVAL"]],type = "prob")
+# prediction_train_GBM <- predict(model_GBM,
+#                             data_train[selectedvars[!selectedvars %in% "PTOTVAL"]][1:1000,])
+# 
+# prediction_test_GBM <- predict(model_GBM,
+#                             data_test[selectedvars[!selectedvars %in% "PTOTVAL"]],type = "prob")
 ```
 
 
 
 b. XGBoost: Extreme Gradient Boosting 
 
+finding optimal values of tree parameters. We will run the model over the range of parameter cominations. Every round of running will keep all but one parameter constant. This way we will be able to tell the parameter achieving the best result. 
 
-finding optimal values of tree parameters
 ```{r}
 
 tc2 <- trainControl(method = "cv",
@@ -673,8 +707,8 @@ tc2 <- trainControl(method = "cv",
                          summaryFunction = twoClassSummary,
                          savePredictions = "final")
 
-
-parameters_grid <- expand.grid(nrounds = 80,
+# testing for various values of min_child_weight
+parameters_grid <- expand.grid(nrounds = 80,  
                               max_depth = seq(5, 15, 2),
                               eta = c(0.25), 
                               gamma = 1,
@@ -696,7 +730,7 @@ model_1
 Accordingly, max_depth = 9, min_child_weight = 200 
 
 ```{r}
-#colsample_bytree 
+# testing for various values of colsample_bytree 
 parameters_grid2 <- expand.grid(nrounds = 80,
                               max_depth = 9,
                               eta = c(0.25), 
@@ -716,10 +750,10 @@ model_2
 ```
 Hence,the best value of colsample_bytree = 0.7
 
-Next we find the optimak sample size. 
+Next we find the optimal sample size. 
 ```{r}
 
-# optimal length of the subsample
+# testing for various values of optimal length of the subsample
 parameters_grid3 <- expand.grid(nrounds = 80,
                               max_depth = 9,
                               eta = c(0.25), 
@@ -740,6 +774,7 @@ model_3
 
 ```
 Optimal subsample = 0.9. 
+
 ```{r}
 
 # lower the learning rate and proportionally increase number of trees
@@ -773,74 +808,159 @@ prediction_test_XGB <- predict(model_XGB,
 ```
 
 
+Checking performance with metrics
+
+```{r}
+
+(stats_XGB <- summary_binary(prediction_test_XGB[,2]))
+```
+
 ## Ensembling
-Ensembling is the process if useing multiple learning algorithms to obtain better predictive performance than could be obtained from any of the constituent learning algorithms alone. 
+Ensembling is the process of using multiple learning algorithms to obtain better predictive performance than could be obtained from any of the constituent learning algorithms alone. 
 THis algorithm has the base models as the bottom layer and one final classifier as the top layer model. 
 
 At this stage we will ensemble the models created above. 
 
+Since the models have already been trained, we can create a dataframe with the predictions (of course on the train data) from each of them. 
 ```{r}
 
-models <- c("model_GINI_final", "model_IG_final", "model_RF", "model_BGM", "model_GB", "model_XGB")
-```
-
-Let's first create a dataframe with the predictions (ofcourse on the train data) from each of them. 
-```{r}
-
-predictions_all <- as.data.frame(GINI = prediction_train_GINI_final, 
-                                 IG = prediction_train_IGI_final,
-                                 RF = prediction_train_RF,
-                                 BGM = prediction_train_BGM,
-                                 GB = prediction_train_GB,
-                                 XG = prediction_train_XG)
+predictions_train_all <- data.frame(IG = prediction_train_IG_final[,2],
+                                 RF = prediction_train_RF[,2],
+                                 XG = prediction_train_XGB[,2])
 
 ```
 
 We can check the correlation between predictions using correlation plots. 
 ```{r}
 
-corrplot::corrplot(cor(predictions_all)) 
+corrplot::corrplot(cor(predictions_train_all)) # all predictions are strongly correlated. 
+
+```
+
+We need to prepare the data for top layer model definition
+
+```{r}
+
+train_set <- predictions_train_all 
+train_set$outcome <- data_train$PTOTVAL
+```
+
+Next step is defining the top layer model. 
+- the top layer model ensembles the predictions of the base layer models. 
+
+```{r}
+# let's use  generalized linear model (logistic regression). 
+
+model_glm<- 
+train(train_set[,1:3],train_set[,4],method='glm')
+
+```
+
+Now the last stage is predicting on the test data using the predictions of the ensembled models. 
+
+Prediction on the test data. 
+```{r}
+
+predictions_test_all <- data.frame(IG = prediction_test_IG_final[,2],
+                                 RF = prediction_test_RF[,2],
+                                 XG = prediction_test_XGB[,2])
+
+```
+
+```{r}
+predictions_test_all$Ensemble <- predict(model_glm,predictions_test_all)
+```
+
+Let's check the performance metrics. 
+
+```{r}
+
+(stats_Ensemble <- summary_binary(predictions_test_all$Ensemble))
+```
+
+## Neural Networks
+
+All variables need to be rescaled to [0,1] range. We use the training data to calculate the scaling parameters to avoid Look-Ahead Bias. 
+```{r}
+data_train_numberic <- data.frame(lapply(data_train,as.numeric))
+data_test_numberic <- data.frame(lapply(data_test,as.numeric))
+
+max_points <- apply(data_train_numberic, 2, max)
+min_points <- apply(data_train_numberic, 2, min)
+
+data_train.scaled <- 
+  as.data.frame(scale(data_train_numberic, 
+                      center = min_points, 
+                      scale  = max_points - min_points))
+data_test.scaled <- 
+  as.data.frame(scale(data_test_numberic, 
+                      center = min_points, 
+                      scale  = max_points - min_points))
 
 ```
 
 
-
-Stacking - stacked generalization
-- And now we can apply stacked generalization - taking out predictions of success for each observation in the cross-validation process. *caretEnsemble* function from caret package will be used. 
-
-
 ```{r}
-
-# Blending with caretEnsemble
-
-model_ensemble <- caretEnsemble(
-  models, 
-  metric = "ROC",
-  trControl = trainControl(
-    number = 2,
-    summaryFunction = twoClassSummary,
-    classProbs = TRUE,
-    savePredictions = "final"
-  ))
-summary(model_ensemble)
-
-predictions_all$ensemble <- predict(model_ensemble, 
-                                newdata = data_test[selectedvars[!selectedvars %in% "PTOTVAL"]], 
-                                type = "prob")
-
-
-
-
+# training the model 
+  model_NN <- neuralnet(PTOTVAL ~ ., 
+                  data = data_train.scaled,
+                  hidden = c(1),
+                  linear.output = T)
+  
 ```
 
-### Comparing the models with ROC 
+
+```{r}
+  # calculating predictions
+  prediction_test_NN <- compute(model_NN, data_test.scaled[, 1:13])
+  
+  # rescaling
+  prediction_test_NN <- 
+    prediction_test_NN$net.result * 
+    (max_points["PTOTVAL"] - min_points["PTOTVAL"]) + min_points["PTOTVAL"]
+```
+
+Evaluation using metrics
 
 ```{r}
 
-list(
-  datausa.ROC.test.glm      = datausa.ROC.test.glm,
-  datausa.ROC.test.rpart    = datausa.ROC.test.rpart,
-  datausa.ROC.test.ensemble = datausa.ROC.test.ensemble) %>%
+(stats_NN <- summary_binary(prediction_test_NN))
+```
+
+
+
+# Evaluation of Performance
+
+We analyse the predictions using the function defined above. Let's first put the predictions all into dataframe. 
+
+The *summary_binary()* requires real values in factor format for *confusionMatrix* calculation.
+To compare the results in a table,  
+
+```{r}
+metrics <- rbind(stats_GINI,stats_IG,stats_RF,stats_XGB,stats_Ensemble,stats_NN)
+row.names(metrics) <- c("GBM with GINI","GBM with IG","Random Forest","XGBoost","Ensemble","Neural Network")
+
+metrics
+```
+
+## Comparison using ROC curve {.tabset}
+An ROC curve plots TPR vs. FPR at different classification thresholds. The area under ROC curve,AUC,can be interpreted as the probability that the model ranks a random positive example more highly than a random negative example. The larger AUC values indicate better models. 
+
+### All ROC curves together
+
+```{r}
+
+prob_2_class <- function(data)
+{
+  return(ifelse(data>0.5,"YES","NO"))
+}
+```
+
+
+```{r}
+
+
+  lapply(c(prediction_test_GINI_final[,2], prediction_test_IG_final[,2], prediction_test_RF[,2], prediction_test_XGB[,2], prediction_test_NN[,2]),prob_2_class) %>%
   pROC::ggroc(alpha = 0.5, linetype = 1, size = 1) + 
   geom_segment(aes(x = 1, xend = 0, y = 0, yend = 1), 
                color = "grey", 
@@ -857,365 +977,13 @@ list(
 
 ```
 
-```{r}
-
-
-```
-
-## Neural Networks
-
-
-All variables need to be rescaled to [0,1] range. We use the training data to calculate the scaling parameters to avoid Look-Ahead Bias. 
-```{r}
-data_train_numberic <- data.frame(lapply(data_train,as.numeric))
-data_test_numberic <- lapply(data_test,as.numeric)
-
-max_points <- apply(data_train_numberic, 2, max)
-min_points <- apply(data_train_numberic, 2, min)
-
-data_train.scaled <- 
-  as.data.frame(scale(data_train_numberic, 
-                      center = min_points, 
-                      scale  = max_points - min_points))
-data_test.scaled <- 
-  as.data.frame(scale(data_test_numberic, 
-                      center = min_points, 
-                      scale  = max_points - min_points))
-
-
-
-```
-
-training the model
-```{r}
-
-variables <- names(data_train)
-
-nn <- neuralnet(PTOTVAL ~ ., 
-                data   = data_train.scaled,
-                # number of neurons in the hidden layer
-                hidden = c(1), 
-                # T for regression, F for classification
-                linear.output = T, 
-                threshold = 0.01,
-                learningrate.limit = NULL,
-                learningrate.factor = list(minus = 0.5, plus = 1.2),
-                algorithm = "rprop+")
-
-# the default algorithm is the Resilient Backpropogation (rprop+)
-# learningrate.limit sets the upper limit of the *learning rate** coefficient
-# learningrate.factor is simply a factor, by which the learning rate coefficient will be changed
-
-plot(nn, rep = "best")
-```
-
-Prediction
-```{r}
-nn.pred <- compute(nn, data_test.scaled[, 1:13])
-
-#opposite transformation (scaling back)
-nn.pred.unscaled <- 
-  nn.pred$net.result * 
-  (max_points["medv"] - min_points["medv"]) + min_points["medv"]
-
-
-```
-
-```{r}
-
-nn3 <- neuralnet(PTOTVAL ~ ., 
-                 data   = data_train.scaled,
-                 hidden = c(10, 3), # neurons in the hidden layer
-                 linear.output = F, # T for regression, F for classification
-                 algorithm = "backprop",
-                 learningrate = 0.0001,
-                 threshold = 0.1,
-                 stepmax = 1e+06,
-                 rep = 1)
-
-plot(nn3, rep = "best")
-nn3.pred <- compute(nn3, data_test.scaled[, 1:13])
-
-nn3.pred.unscaled <- 
-  nn3.pred$net.result * 
-  (max_points["medv"] - min_points["medv"]) + min_points["medv"]
-
-
-```
-
-
-cross-validation of NNs
-```{r}
-
-k <- 10
-set.seed(123456789)
-index.df <- 
-  as.data.frame(split((1:260)[order(runif(260))], 1:10))
-
-
-set.seed(20200308)
-for (i in 1:k) {
-  cat("cv fold ", i, "/", k, " ... ", sep = "")
-  data_train.cv <- data_train[-index.df[, i],]
-  data_test.cv  <- data_train[ index.df[, i],]
-  
-  # scaling---- ------------------------------
-  max_points <- apply(data_train.cv, 2, max) 
-  min_points <- apply(data_train.cv, 2, min)
-  data_train.cv.scaled <- 
-    as.data.frame(scale(data_train.cv, 
-                        center = min_points, 
-                        scale  = max_points - min_points))
-  data_test.cv.scaled <- 
-    as.data.frame(scale(data_test.cv, 
-                        center = min_points, 
-                        scale  = max_points - min_points))
-  
-  # training the network -----------------------
-  nn <- neuralnet(PTOTVAL ~ ., 
-                  data = data_train.cv.scaled,
-                  hidden = c(5),
-                  linear.output = T)
-  
-  # calculating predictions --------------------
-  nn.pred <- compute(nn, data_test.cv.scaled[, 1:13])
-  
-  # rescaling ----------------------------------
-  nn.pred.unscaled <- 
-    nn.pred$net.result * 
-    (max_points["medv"] - min_points["medv"]) + min_points["medv"]
-  
-  # calculating the error for a given CV fold 
-  (cv.nn.error[i] <- 
-      sum((data_test.cv$medv - nn.pred.unscaled)^2) / nrow(data_test.cv))
-
-}
-
-
-```
-
-Prediction
-
-```{r}
-
-datausa.test.mtx <- 
-  model.matrix(object = PTOTVAL ~ ., 
-               data = datausa.test)
-
-```
-
-```{r}
-
-datausa.pred.nn <- compute(datausa.nn, datausa.test.mtx[, -1])
-datausa.pred.nn$net.result %>% head(10)
-
-```
-
-```{r}
-
-confusionMatrix.nn <-
-  confusionMatrix(as.numeric((datausa.pred.nn$net.result > 0.5)) %>% as.factor(),
-                  as.factor(ifelse(data_test$PTOTVAL == "Yes", 1, 0)))
-
-```
-
-
-```
-
-## Prediction
-
-**Decision Trees for classification**
-
-a. CART
-
-```{r}
-
-predict_CART <- predict(model_logit,data_test[selectedvars],
-                          type = "response") # type  = "class" to predict directly value of the target variable
-
-```
-
-
-b. C5.0 
-
-**Random Forests**
-
-**Bagging (bootstrap averaging)**
-
-Subbagging - Subsample Aggregating
-
-**Boosting **
-
-a. GBM: Gradient Boosting Models
-a.1 Stochastic Gradient Boosting
-
-b. XGBost: Extreme Gradient Boosting 
+### Area Under Roc
 
 ```{r}
 
 
 ```
 
-c. CatBoost - Category and Boosting
-
-```{r}
-
-
-```
-
-
-d. AdaBoost: Adaptive Boosting
-
-```{r}
-
-
-```
-
-
-
-**Ensembling**
-
-
-a. Majority voting or weighted voting
-
-b. Stacking - stacked generalization
-
-
-**Neural Networks**
-
-
-a.logit
-```{r}
-predict_logit <- predict(model_logit,data_test[selectedvars],
-                          type = "response")
-```
-
-b.probit
-```{r}
-predict_probit <- predict(model_probit,data_test[selectedvars],
-                          type = "response")
-```
-
-
-**Naive Bayes**
-
-```{r}
-predict_nb <- predict(model_nb,data_test[selectedvars],
-                          type = "raw")
-predict_nb <- predict_nb[,2]
-```
-
-**Random Forest**
-
-Let's first get the train and test data to have the same class. 
-```{r}
-xtest <- rbind(data_train[1, ] , data_test)
-xtest <- xtest[-1,]
-```
-
-
-```{r}
-predict_rf <- predict(model_rf,xtest,
-                       type = "response")
-```
-
-
-# Evaluation of Performance
-
-We analyse the predictions using the function defined above. Let's first put the predictions all into dataframe. 
-
-```{r}
-
-predictions <- data.frame(logit = predict_logit,probit = predict_probit,
-                             nb = predict_nb,rf = predict_rf)
-
-```
-
-The *summary_binary()* requires real values in factor format for *confusionMatrix* calculation. The following code chunk does that. 
-```{r}
-data_test$PTOTVAL <- factor(data_test$PTOTVAL)
-```
-
-Here we call the *summary_binary()* function for every pair of prediction and real value. The results will be compiled into a single dataframe for easier comparison.
-
-```{r}
-
-stats_logit <- summary_binary(predictions$logit,data_test$PTOTVAL) #1. logit
-stats_probit <- summary_binary(predictions$probit,data_test$PTOTVAL) #2. probit
-stats_nb <- summary_binary(predictions$nb,data_test$PTOTVAL) #3. KNN
-stats_rf <- summary_binary(predictions$rf,data_test$PTOTVAL) #4. SVM
-```
-
-To compare the results in a table,  
-```{r}
-metrics <- rbind(stats_logit,stats_probit,stats_nb,stats_rf)
-row.names(metrics) <- c("Logit","Probit","Naive Bayes","Random Forest")
-metrics
-```
-
-## Comparison using ROC curve {.tabset}
-An ROC curve plots TPR vs. FPR at different classification thresholds. The area under ROC curve,AUC,can be interpreted as the probability that the model ranks a random positive example more highly than a random negative example. The larger AUC values indicate better models. 
-
-### Logit
-```{r}
-
-data_test$PTOTVAL <- ifelse(data_test$PTOTVAL=="0",0,1)
-roc.plot(data_test$PTOTVAL,
-         predictions$logit)
-
-```
-
-Area under ROC
-```{r}
-roc.area(data_test$PTOTVAL,
-         predictions$logit)$A
-
-```
-
-### Probit
-```{r}
-
-roc.plot(data_test$PTOTVAL,
-         predictions$probit)
-
-```
-
-Area under ROC
-```{r}
-roc.area(data_test$PTOTVAL,
-         predictions$probit)$A
-
-```
-
-
-### Naive Bayes
-```{r}
-
-roc.plot(data_test$PTOTVAL,
-         predictions$nb)
-
-```
-
-Area under ROC
-```{r}
-roc.area(data_test$PTOTVAL,
-         predictions$nb)$A
-
-```
-
-### Random Forest
-```{r}
-
-roc.plot(data_test$PTOTVAL,
-         predictions$rf)
-
-```
-
-Area under ROC
-```{r}
-roc.area(data_test$PTOTVAL,
-         predictions$rf)$A
-```
 
 # Conclusion
 
