@@ -25,59 +25,37 @@ Classification is a supervised machine learning algorithm of assigning a class l
 
 The predictions will be either above 50K or below 50K. Since the dependent variable is of a categorical type, we have a classification problem at hand. 
 
-While there are numerous techniques of classification, we will apply the following three and compare the results:
+While there are numerous techniques of classification, we will apply the following three and compare the results: Classification trees, random forests and neural networks. We will also test if ensembling those algorithms with bagging, boosting and stacking improve the results.
 
 **1. Classification Trees**
-
-CART  - uses Gini purity/coefficient
-C5.0 - uses information gain (IG) - IG is measured by entropy (1-entropy)
-
-Gini coefficient
+Decision trees can be used for classification problem. The two most common approaches are: 
+1. CART  - uses Gini purity/coefficient
+2. C5.0 - uses information gain (IG) - IG is measured by entropy (1-entropy)
 
 **2. Random Forests**
 
 Random forest is a supervised learning algorithm/model that uses a large number of ensembled decision trees on data samples. Each tree in the forest makes a prediction and the best solution is selected based on voting. This model is common for its simplicity and diversity hence, the combination of the multiple decision trees is likely to get a more accurate and stable prediction.
 
+**3. Neural Networks **
 
-**3. Bagging (Bootstrap Averaging**
+**4. Ensembling **
+Ensembling is combining predictions from various models to improve the result. It is using multiple learning algorithms to obtain better predictive performance than could be obtained from any of the constituent learning algorithms alone. Some of the ensembling methods are to be covered: 
 
-“predicting with votes”.
-Estimating the out-of-bag error - OOB
+**a. Bagging (Bootstrap Averaging)**
 
-**4. Boosting of decision trees**
+Bagging improves the stability and accuracy of machine learning algorithms. It also reduces variance since it is a way of filtering out the output with specail way of averaging. 
 
-“predicting with votes”.
-Estimating the out-of-bag error - OOB
+**b. Boosting of decision trees**
+Boosting algorithms reduce bias, and also variance converting weak learners to strong ones. There are many boosting algorithms, however, we will use XGBost, an abbreviation for Extreme Gradient Boosting
 
-**a. GBM: Gradient Boosting Models**
+**XGBost: Extreme Gradient Boosting**
+ It is also called regularized boosting method. Some of its important features are intelligent tree prunning, Newton-Raphson approximation, Additional randomization parameter and parallelization. 
 
-**a.1 Stochastic Gradient Boosting **
 
-**b. XGBost: Extreme Gradient Boosting**
- also called regularized boosting method, has 
+**c. Majority voting or weighted voting **
 
-- Intelligent tree prunning
-- Newton-Raphson approximation
-- Additional randomization parameter
-- parallelization
-**c. CatBoost - Category and Boosting**
-machine learning algorithm from Yandex - yields state-of-the-art results without extensive data training, and provides powerful out-of-the-box support for the more descriptive data formats. It also handles categorical variables automatically. 
-
-**d. AdaBoost: Adaptive Boosting**
-
-- the new predictor corrects the weights of predecessors were mis-classified or for which we observe string under- or over-prediction. 
- 
-**5. Ensembling **
-
-combining predictions from various models to improve the result. 
-
-**a. Majority voting or weighted voting **
-
-**b. Stacking - stacked generalization **
+**d. Stacking - stacked generalization **
 - additonal model is trained to conduct aggregation, instead of voting/averaging. Stacking increases accuracy of the model and reduces its variance
-
-
-**6. Neural Networks **
 
 **Data source**
 
